@@ -4,71 +4,42 @@ import sys
 import os
 from numba import njit, prange
 from scipy.spatial import cKDTree
+from concurrent.futures import ThreadPoolExecutor
+
+# Add parent directory to path to allow relative imports
 sys.path.insert(0, os.path.abspath('..'))
 from . import demarcators
-
-
-def add_column_to_df(df, source_file, key_column, new_column_name, sheet_name):
-    """
-    Merges a specific column from a CSV or Excel file into an existing DataFrame based on a common key column
-    (usually cycle number).
-
-    Parameters:
-    - df (pd.DataFrame): The existing DataFrame.
-    - source_file (str): Path to the source file (CSV or Excel).
-    - key_column (str): The column name to merge on.
-    - new_column_name (str): The name of the new column to add.
-    - sheet_name (str, optional): The sheet name in the source Excel file. Default is None.
-
-    Returns:
-    - pd.DataFrame: The updated DataFrame with the new column added.
-    """
-    # Check the file extension to determine the reading method
-    if source_file.endswith('.csv'):
-        source_df = pd.read_csv(source_file)
-    elif source_file.endswith('.xlsx'):
-        source_df = pd.read_excel(source_file, sheet_name=sheet_name,  engine="openpyxl")
-    else:
-        raise ValueError("Unsupported file format. Please provide a CSV or Excel file.")
-
-    # Ensure the key column exists in both DataFrames
-    if key_column not in df.columns or key_column not in source_df.columns:
-        raise ValueError(f"Key column '{key_column}' must exist in both DataFrames.")
-
-    # Merge the new column into the existing DataFrame
-    merged_df = df.merge(source_df[[key_column, new_column_name]], on=key_column, how='left')
-
-    return merged_df
 
 
 @njit(parallel=True)
 def _numba_mask(arrays, centers, margins):
     """
-    Compute a boolean mask for rows where all values fall within [center - err, center + err].
+    Compute a boolean mask for columns (rows in original DataFrame) 
+    where all values fall within [center - margin, center + margin].
 
-    This Numba-compiled function runs in parallel (multi-threaded) across rows using prange.
-    It stops checking a row as soon as one column is out-of-bound, avoiding unnecessary work.
+    This function is JIT-compiled with Numba for parallel execution.
 
-    Parameters:
-    -----------
-    arrays : 2D np.ndarray
-        Input data shaped (n_cols, n_rows), each row across columns is tested.
-    centers : 1D np.ndarray
-        Center values for each column (length = n_cols).
-    margins : 1D np.ndarray
-        Margins for each column (length = n_cols).
+    Parameters
+    ----------
+    arrays : np.ndarray, shape (n_cols, n_rows)
+        2D array where each row corresponds to a feature and each column is a sample.
+    centers : np.ndarray, shape (n_cols,)
+        Center values for each feature.
+    margins : np.ndarray, shape (n_cols,)
+        Allowed error margins for each feature.
 
-    Returns:
-    --------
-    mask : 1D np.ndarray of bool
-        True for rows where all column values are within [center - err, center + err].
+    Returns
+    -------
+    mask : np.ndarray of bool, shape (n_rows,)
+        Boolean mask where True means the column satisfies all feature bounds.
     """
     n_cols, n_rows = arrays.shape
     mask = np.ones(n_rows, dtype=np.bool_)
     for j in prange(n_rows):
         for i in range(n_cols):
             v = arrays[i, j]
-            c = centers[i]; e = margins[i]
+            c = centers[i]
+            e = margins[i]
             if v < c - e or v > c + e:
                 mask[j] = False
                 break
@@ -77,111 +48,162 @@ def _numba_mask(arrays, centers, margins):
 
 def filter_df(df, margins):
     """
-    Filter DataFrame rows by column-wise margins.
+    Filter DataFrame rows using column-wise margins.
 
-    Parameters:
-    -----------
-    df : pandas.DataFrame
-        Input dataframe containing numeric columns used in margins.
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input DataFrame with numeric columns.
     margins : dict[str, list[float, float]]
-        Mapping from column name to [center, error_margin].
+        Dictionary mapping column names to [center, margin] pairs.
 
-    Returns:
-    --------
-    pandas.DataFrame
-        Subset of `df` where each column `col` satisfies:
-        center - error_margin <= value <= center + error_margin.
-
-    Raises:
+    Returns
     -------
+    pd.DataFrame
+        Filtered DataFrame containing only rows that fall within the specified bounds.
+
+    Raises
+    ------
     KeyError
-        If any column in `margins` is missing from `df`.
+        If any key in `margins` is missing from `df`.
     """
     cols = list(margins)
-    for c in cols:
-        if c not in df.columns:
-            raise KeyError(f"Column {c!r} not found in DataFrame.")
-    centers = np.array([margins[c][0] for c in cols], dtype=float)
-    errs = np.array([margins[c][1] for c in cols], dtype=float)
-    arr = np.vstack([df[c].to_numpy() for c in cols])
+    for col in cols:
+        if col not in df.columns:
+            raise KeyError(f"Column {col!r} not found in DataFrame.")
+
+    centers = np.array([margins[col][0] for col in cols], dtype=float)
+    errs = np.array([margins[col][1] for col in cols], dtype=float)
+    arr = np.vstack([df[col].to_numpy() for col in cols])
     mask = _numba_mask(arr, centers, errs)
     return df.loc[mask].copy()
 
 
-def find_closest_system(dfs, margins):
+def process_df(df, margins, center_vec, features):
     """
-    From multiple DataFrames, apply `filter_df` to each using `margins`, then find
-    the one whose filtered DataFrame contains the row closest to the centers.
+    Process a single DataFrame to find the closest matching row to the center vector.
 
     Parameters
     ----------
-    dfs : list[pd.DataFrame]]
-        Candidate DataFrames to search.
-    margins : dict[str, (center, err)]
-        Columns and margin specs to filter by.
+    df : pd.DataFrame
+        Input DataFrame to process.
+    margins : dict[str, list[float, float]]
+        Mapping of features to [center, margin] values.
+    center_vec : np.ndarray
+        Vector of target feature values.
+    features : list[str]
+        List of feature column names to consider.
 
     Returns
     -------
-    best_filtered_df : pd.DataFrame
-        The filtered DataFrame whose best row is closest to the center vector.
-    best_row : pd.Series
-        The single best matching row.
+    dict or None
+        Dictionary with keys: 'df', 'filtered', 'row', 'dist', 'orig_idx', 
+        or None if no valid row was found.
+    """
+    filtered = filter_df(df, margins)
+    if filtered.empty:
+        return None
+
+    pts = filtered[features].to_numpy()
+    mask = np.isfinite(pts).all(axis=1)
+    if not mask.all():
+        filtered = filtered.iloc[mask]
+        pts = pts[mask]
+    if pts.size == 0:
+        return None
+
+    if len(pts) == 1:
+        dist = np.linalg.norm(center_vec - pts[0])
+        idx = 0
+    else:
+        tree = cKDTree(pts)
+        dist, idx = tree.query(center_vec, k=1)
+
+    orig_idx = filtered.index[idx]
+    return {
+        'df': df,
+        'filtered': filtered,
+        'row': df.loc[orig_idx],
+        'dist': dist,
+        'orig_idx': orig_idx
+    }
+
+
+def find_closest_system_parallel(dfs, margins, max_workers=4):
+    """
+    Find the closest matching system across multiple DataFrames in parallel.
+
+    Parameters
+    ----------
+    dfs : list of pd.DataFrame
+        List of candidate DataFrames.
+    margins : dict[str, list[float, float]]
+        Feature-specific center and margin bounds.
+    max_workers : int, optional
+        Number of threads to use in the thread pool (default is 4).
+
+    Returns
+    -------
+    tuple
+        (original DataFrame, filtered DataFrame, best matching row as pd.Series)
 
     Raises
     ------
     ValueError
-        If none of the DataFrames has any rows within the margins.
+        If no matching system was found.
     """
     features = list(margins.keys())
     center_vec = np.array([margins[c][0] for c in features], dtype=float)
 
-    best = {'df': None, 'filtered': None, 'row': pd.Series(dtype=float), 'dist': np.inf, 'orig_idx': None}
+    results = []
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(process_df, df, margins, center_vec, features) for df in dfs]
+        for future in futures:
+            res = future.result()
+            if res is not None:
+                results.append(res)
 
-    for df in dfs:
-        filtered = filter_df(df, margins)
-        if filtered.empty:
-            continue
-
-        pts = filtered[features].to_numpy()
-
-        mask = np.isfinite(pts).all(axis=1)
-        if not mask.all():
-            filtered = filtered.iloc[mask]
-            pts = pts[mask]
-        if pts.size == 0:
-            continue
-
-        tree = cKDTree(pts)
-        dist, idx = tree.query(center_vec, k=1)
-
-        if dist < best['dist']:
-            orig_idx = filtered.index[idx]  # capture index in original df
-            best.update({
-                'df': df,
-                'filtered': filtered,
-                'row': df.loc[orig_idx],  # full row from original
-                'dist': dist,
-                'orig_idx': orig_idx
-            })
-
-    if best['df'] is None:
+    if not results:
         raise ValueError("No match found with any system in the database for the given values.")
 
+    best = min(results, key=lambda r: r['dist'])
     return best['df'], best['filtered'], best['row']
 
 
-def estimate_nova(dfs, margins):  
-    best_estimation = find_closest_system(dfs, margins)
-    df =  best_estimation[0]
-    # filterd_df = best_estimation[1]
-    closest_row = best_estimation[2]
+def estimate_nova(dfs, margins, max_workers=4):
+    """
+    Estimate how far into a nova eruption cycle the matched event occurred.
+
+    Parameters
+    ----------
+    dfs : list of pd.DataFrame
+        List of candidate system DataFrames.
+    margins : dict[str, list[float, float]]
+        Column-wise center and error margins.
+    max_workers : int, optional
+        Number of threads to use for parallel search (default is 4).
+
+    Returns
+    -------
+    float
+        Time elapsed since the start of the nova eruption cycle for the matched row.
+        Returns -1 if no match was found.
+
+    Raises
+    ------
+    ValueError
+        If no valid row is found across all systems.
+    """
+    df, filtered_df, closest_row = find_closest_system_parallel(dfs, margins, max_workers)
     if not closest_row.empty:
-        # find time and cycle number at the closest row:
         cycle = closest_row["cycle"]
         time = closest_row["time"]
-    
-        #  A dictionary where keys are cycles numbers and their values are lists containing the timing of their start and end 
-        cycles_timing = demarcators.demarcate_nova_eruptions(df)
-        return  time - cycles_timing[cycle][0]
+
+        mask_ej = df["accumulated mass"] < 0
+        eruption_outset_row_idx = df.loc[mask_ej].index[0] if mask_ej.any() else None
+        return time - df.loc[eruption_outset_row_idx, "time"]
+
+        # cycle_delimiters = demarcators.demarcate_nova_eruptions(df)
+        #return time - cycle_delimiters[cycle][0]
     else:
         return -1
