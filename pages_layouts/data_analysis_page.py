@@ -8,11 +8,11 @@ data_analysis_page = html.Div([
 
         html.Div([
             html.Label("System Name:", className='input-label'),
-            dcc.Input(
-                id='system-name-input-temp-time',
-                type='text',
-                placeholder='Enter system name',
-                className='text-input',
+            dcc.Dropdown(
+                id='system-name-dropdown-temp-time',
+                placeholder='Select system name',
+                className='dropdown-input',
+                options=[]  # Will be filled dynamically via callback
             ),
         ], className='input-group'),
 

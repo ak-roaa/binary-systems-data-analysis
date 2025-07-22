@@ -167,7 +167,10 @@ def plot_cycles_lengths_vs_param(l_df, mat_df, param, log_x=False, log_y=False):
     if param not in mat_df.columns:
         raise ValueError(f"'{param}' not found in 'mat_df'.")
 
-    param_series = mat_df.set_index("cycle")[param]
+    if param == "cycle":
+        param_series = mat_df.set_index("cycle").index.to_series()
+    else:
+        param_series = mat_df.set_index("cycle")[param]
 
     # Filter valid cycles
     valid_data = {
@@ -220,60 +223,20 @@ def plot_cycles_lengths_vs_param(l_df, mat_df, param, log_x=False, log_y=False):
     return fig
 
 
-def add_columns_to_df(df, source_file, key_column, column_indices_to_add, sheet_name=None):
-    """
-    Adds columns from an external CSV or Excel file to a DataFrame,
-    using a shared key column for merging.
-
-    Parameters
-    ----------
-    df : pandas.DataFrame
-        The base DataFrame to which columns will be added.
-    source_file : str
-        Path to the source file (.csv or .xlsx).
-    key_column : str
-        Column in `df` to match with the row index of the source file.
-    column_indices_to_add : list of int
-        Indices of columns to import from the source file.
-    sheet_name : str, optional
-        Sheet name to use if the file is an Excel workbook.
-
-    Returns
-    -------
-    pandas.DataFrame
-        The original DataFrame with new columns added.
-    """
-    source_df = pd.read_excel(source_file, sheet_name=sheet_name) \
-        if source_file.endswith(('.xls', '.xlsx')) else pd.read_csv(source_file)
-    source_df.index = source_df.reset_index().index + 1  # Ensure numeric index starting at 1
-
-    all_columns = list(source_df.columns)
-    selected_columns = [
-        all_columns[i] for i in column_indices_to_add
-        if 0 <= i < len(all_columns) and all_columns[i] not in df.columns
-    ]
-
-    if not selected_columns:
-        return df
-
-    source_subset = source_df[selected_columns]
-    merged_df = df.merge(source_subset, how='left', left_on=key_column, right_index=True)
-
-    return merged_df
-
-
-def plot_cycles(df, cycles_list, demarcator_func):
+def plot_cycles(l_df, mat_df, cycles_list, demarcator_func):
     """
     Plots the time vs effective temperature for specified cycles.
 
     Parameters
     ----------
-    df : pandas.DataFrame
+    l_df : pandas.DataFrame
         Input data with time and effective temperature columns.
+    mat_df : pandas.DataFrame
+        Contains metadata including MWD and possibly companion_mass.
     cycles_list : list of int
         List of cycle numbers to plot.
     demarcator_func : callable
-        Function that takes `df` and returns a dict mapping cycle numbers
+        Function that takes `l_df` and returns a dict mapping cycle numbers
         to (start_index, end_index) tuples.
 
     Returns
@@ -281,7 +244,7 @@ def plot_cycles(df, cycles_list, demarcator_func):
     plotly.graph_objects.Figure
         A Plotly scatter plot of effective temperature over time per cycle.
     """
-    cycles_dict = demarcator_func(df)
+    cycles_dict = demarcator_func(l_df)
     fig = go.Figure()
 
     for cycle in cycles_list:
@@ -289,15 +252,30 @@ def plot_cycles(df, cycles_list, demarcator_func):
         if start_idx is None or end_idx is None:
             continue
 
-        phase = df.iloc[start_idx:end_idx].copy()
+        phase = l_df.iloc[start_idx:end_idx].copy()
         phase['time'] -= phase['time'].min()
         phase['time'] = np.log10(phase['time'] + 1e-10)  # Prevent log(0)
+
+        # Prepare label with optional MWD and companion_mass
+        label = f"Cycle {cycle}"
+        if cycle in mat_df.index:
+            mwd = mat_df.at[cycle, 'MWD'] if 'MWD' in mat_df.columns else None
+            companion = mat_df.at[cycle, 'companion_mass'] if 'companion_mass' in mat_df.columns else None
+
+            extra_info = []
+            if mwd is not None and not np.isnan(mwd):
+                extra_info.append(f"MWD={mwd:.2f}")
+            if companion is not None and not np.isnan(companion):
+                extra_info.append(f"Comp={companion:.2f}")
+
+            if extra_info:
+                label += " (" + ", ".join(extra_info) + ")"
 
         fig.add_trace(go.Scatter(
             x=phase['time'],
             y=phase['effective temperature'],
             mode='markers',
-            name=f"Cycle {cycle}"
+            name=label
         ))
 
     fig.update_layout(
@@ -310,13 +288,3 @@ def plot_cycles(df, cycles_list, demarcator_func):
     )
 
     return fig
-
-
-"""
-if __name__ == "__main__":
-    df = read_l.concatenate_files(["l_045_025_A", "l_044_019_B"])
-    df = add_columns_to_df(df, "MWD_MRD.xlsx", "cycle", [0, 1], "045_025")
-    # get_df_preview(df,["cycle", "time", "MWD", "MRD", "effective temperature"])
-    # fig = plot_x_vs_y(df, "time", "effective temperature", log_x=True)
-    print(system_info(df))
-"""

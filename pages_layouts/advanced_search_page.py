@@ -17,33 +17,33 @@ advanced_search_page = html.Div([
         html.Div([
             html.Div([
                 html.Label("White Dwarf Mass (M☉):", className='input-label'),
-                dcc.Input(id='wd-mass-input', type='number', placeholder='e.g., 0.6', min=0.1, max=1.4, step=0.01, className='text-input numeric-input'),
+                dcc.Input(id='wd-mass-input', type='number', placeholder='e.g., 0.69998', className='text-input numeric-input'),
             ], className='input-group'),
             html.Div([
                 html.Label("Tolerance interval:", className='input-label'),
-                dcc.Input(id='wd-mass-delta-input', type='number', placeholder='e.g., 0.0005', min=0, step=0.01, className='text-input numeric-input delta-input'),
+                dcc.Input(id='wd-mass-delta-input', type='number', placeholder='e.g., 0.00008', className='text-input numeric-input delta-input'),
             ], className='input-group'),
         ], className='input-pair-container'),
 
         html.Div([
             html.Div([
                 html.Label("Companion Mass (M☉):", className='input-label'),
-                dcc.Input(id='comp-mass-input', type='number', placeholder='e.g., 0.0003', min=0.01, max=1.0, step=0.01, className='text-input numeric-input'),
+                dcc.Input(id='comp-mass-input', type='number', placeholder='e.g., 0.4499', className='text-input numeric-input'),
             ], className='input-group'),
             html.Div([
                 html.Label("Tolerance interval:", className='input-label'),
-                dcc.Input(id='comp-mass-delta-input', type='number', placeholder='e.g., 0.0002', min=0, step=0.01, className='text-input numeric-input delta-input'),
+                dcc.Input(id='comp-mass-delta-input', type='number', placeholder='e.g., 0.0009', className='text-input numeric-input delta-input'),
             ], className='input-group'),
         ], className='input-pair-container'),
 
         html.Div([
             html.Div([
                 html.Label("Effective Temperature (log K):", className='input-label'),
-                dcc.Input(id='eff-temp-input', type='number', placeholder='e.g., 4.2', min=3.0, max=5.0, step=0.01, className='text-input numeric-input'),
+                dcc.Input(id='eff-temp-input', type='number', placeholder='e.g., 3.18', className='text-input numeric-input'),
             ], className='input-group'),
             html.Div([
                 html.Label("Tolerance interval:", className='input-label'),
-                dcc.Input(id='eff-temp-delta-input', type='number', placeholder='e.g., 0.01', min=0, step=0.01, className='text-input numeric-input delta-input'),
+                dcc.Input(id='eff-temp-delta-input', type='number', placeholder='e.g., 0.01', className='text-input numeric-input delta-input'),
             ], className='input-group'),
         ], className='input-pair-container'),
 
@@ -75,7 +75,7 @@ advanced_search_page = html.Div([
             ], className='input-group'),
             html.Div([
                 html.Label("Tolerance interval:", className='input-label'),
-                dcc.Input(id='param1-delta', type='number', placeholder='Delta', min=0, step=0.01, className='text-input numeric-input delta-input'),
+                dcc.Input(id='param1-delta', type='number', placeholder='Delta', className='text-input numeric-input delta-input'),
             ], className='input-group'),
         ], className='input-triple-container'),
 
@@ -96,7 +96,7 @@ advanced_search_page = html.Div([
             ], className='input-group'),
             html.Div([
                 html.Label("Tolerance interval:", className='input-label'),
-                dcc.Input(id='param2-delta', type='number', placeholder='Delta', min=0, step=0.01, className='text-input numeric-input delta-input'),
+                dcc.Input(id='param2-delta', type='number', placeholder='Delta', className='text-input numeric-input delta-input'),
             ], className='input-group'),
         ], className='input-triple-container'),
 
@@ -117,7 +117,7 @@ advanced_search_page = html.Div([
             ], className='input-group'),
             html.Div([
                 html.Label("Tolerance interval:", className='input-label'),
-                dcc.Input(id='param3-delta', type='number', placeholder='Delta', min=0, step=0.01, className='text-input numeric-input delta-input'),
+                dcc.Input(id='param3-delta', type='number', placeholder='Delta', className='text-input numeric-input delta-input'),
             ], className='input-group'),
         ], className='input-triple-container'),
 
@@ -150,7 +150,7 @@ advanced_search_page = html.Div([
             ], className='input-group'),
             html.Div([
                 html.Label("Tolerance interval:", className='input-label'),
-                dcc.Input(id='param1-two-delta', type='number', placeholder='Delta', min=0, step=0.01, className='text-input numeric-input delta-input'),
+                dcc.Input(id='param1-two-delta', type='number', placeholder='Delta', className='text-input numeric-input delta-input'),
             ], className='input-group'),
         ], className='input-triple-container'),
 
@@ -171,7 +171,7 @@ advanced_search_page = html.Div([
             ], className='input-group'),
             html.Div([
                 html.Label("Tolerance interval:", className='input-label'),
-                dcc.Input(id='param2-two-delta', type='number', placeholder='Delta', min=0, step=0.01, className='text-input numeric-input delta-input'),
+                dcc.Input(id='param2-two-delta', type='number', placeholder='Delta',  className='text-input numeric-input delta-input'),
             ], className='input-group'),
         ], className='input-triple-container'),
 

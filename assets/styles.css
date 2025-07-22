@@ -238,6 +238,14 @@ p {
     background-color: #0056b3;
 }
 
+.button-margin-right {
+    margin-right: 10px;
+}
+
+.button-margin-top {
+    margin-top: 10px;
+}
+
 .success-button {
     background-color: #48bb78;
 }
@@ -384,3 +392,32 @@ th.dash-header div span.column-header--sort {
 .dash-table-container .dash-spreadsheet-inner table {
   --accent: black !important;
 }
+
+
+/* ----------------------------------------
+   14. Multiple inputs in one row
+---------------------------------------- */
+.radio-inline-label .dash-radio-items label {
+    display: inline-block;
+    margin-right: 15px;
+}
+
+.flex-row-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.flex-1 {
+    flex: 1;
+}
+
+.flex-1-margin-right {
+    flex: 1;
+    margin-right: 1rem;
+}
+
+.input-group {
+    margin-bottom: 1rem;
+}
+

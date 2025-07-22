@@ -1,5 +1,7 @@
 import os
 import re
+import pandas as pd
+import string
 
 
 def inspect_db(db_path):
@@ -13,18 +15,18 @@ def inspect_db(db_path):
     Returns:
         dict: A dictionary where the keys are system names (subdirectory names), and the values
               are lists containing two sorted lists:
-              - One list of `.l` file paths.
-              - One list of `.mat` file paths.
+              - One list of `l` file paths.
+              - One list of `mat` file paths.
     """
     systems_dict = {}
 
     for system in os.listdir(db_path):
         system_path = os.path.join(db_path, system)
         
-        if os.path.isdir(system_path): # Every system has mat and l files
+        if os.path.isdir(system_path):
             # Separate files by starting letter and collect file paths
-            l_files = sorted([f for f in os.listdir(system_path) if f.startswith('l')], key=lambda f: f[-5:])
-            mat_files = sorted([f for f in os.listdir(system_path) if f.startswith('mat')], key=lambda f: f[-5:])
+            l_files = sorted([f for f in os.listdir(system_path) if f.startswith('l')], key=lambda f: f[-1])
+            mat_files = sorted([f for f in os.listdir(system_path) if f.startswith('mat')], key=lambda f: f[-1])
 
             # Add system to dictionary
             systems_dict[system] = [l_files, mat_files]
@@ -120,4 +122,3 @@ def delete_file_from_system(db_path, system_name, filename):
         os.remove(file_path)
     except FileNotFoundError:
         raise FileNotFoundError(f"File '{filename}' not found in system '{system_name}'.")
-

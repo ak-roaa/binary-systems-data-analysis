@@ -1,13 +1,11 @@
 from dash import dcc, html
 
-
 db_page = html.Div([
 
     # SECTION 1: View Systems
     html.Div([
         html.H3("View Systems", className='section-title'),
         html.P("Browse and inspect the binary systems currently in the database."),
-
         html.Button("View All Systems", id="load-systems-button", n_clicks=0, className='button'),
         html.Div(id="systems-list-output", className='output-area'),
     ], className='section-container'),
@@ -66,11 +64,14 @@ db_page = html.Div([
         ], className='input-group'),
 
         html.Div([
-            html.Button("Add File", id="add-file-button", n_clicks=0, className='button', style={'marginRight': '10px'}),
-            html.Button("Delete File", id="delete-file-button", n_clicks=0, className='button', style={'marginRight': '10px'}),
+            html.Button("Add File", id="add-file-button", n_clicks=0, className='button button-margin-right'),
+            html.Button("Delete File", id="delete-file-button", n_clicks=0, className='button button-margin-right'),
             html.Button("Delete System", id="delete-system-button", n_clicks=0, className='button'),
-        ], style={'marginTop': '10px'}),
+        ], className='button-group button-margin-top'),
+
         html.Div(id='update-existing-system-output', className='output-area'),
     ], className='section-container'),
+
+    html.Hr(className='section-divider'),
 
 ], className='page-content')

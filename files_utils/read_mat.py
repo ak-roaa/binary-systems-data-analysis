@@ -18,19 +18,26 @@ def read_mat_file(file_name):
         'Tmax', 'Tc', 'RHOc', 'time', 't3', 't-ML', 'C12', 'C13',
         'N14', 'N15', 'O16', 'O17', 'O18', 'Ne', 'Na', 'Mg',
         'Al26', 'Al27', 'Si', 'P', 'Vej_avg', 'Mdot_ej',
-        'MWD', 'Iacc', 'Iej', 'Press'
+        'MWD', 'Iacc', 'Iej', 'Press', and optionally 'companion_mass'
     """
     df = pd.read_csv(file_name, sep=r"\s+", header=None, low_memory=False)
     df = df.apply(pd.to_numeric, errors='coerce')
-    df = df.iloc[1:,]  # Skip the first row
+    df = df.iloc[1:, ]  # Skip the first row
 
-    column_names = [
-    "cycle", "Macc", "Menv", "Mej", "Yenv", "Yej", "Zenv", "Zej",
-    "Tmax", "Tc", "RHOc", "time", "t3", "t-ML", "C12", "C13",
-    "N14", "N15", "O16", "O17", "O18", "Ne", "Na", "Mg",
-    "Al26", "Al27", "Si", "P", "Vej_avg", "Mdot_ej",
-    "MWD", "Iacc", "Iej", "Press"
+    base_columns = [
+        "cycle", "Macc", "Menv", "Mej", "Yenv", "Yej", "Zenv", "Zej",
+        "Tmax", "Tc", "RHOc", "time", "t3", "t-ML", "C12", "C13",
+        "N14", "N15", "O16", "O17", "O18", "Ne", "Na", "Mg",
+        "Al26", "Al27", "Si", "P", "Vej_avg", "Mdot_ej",
+        "MWD", "Iacc", "Iej", "Press"
     ]
+
+    # If number of columns matches base_columns + 1, assume extra column is companion_mass
+    if df.shape[1] == len(base_columns) + 1:
+        column_names = base_columns + ["companion_mass"]
+    else:
+        column_names = base_columns
+
     df.columns = column_names
     return df
 
